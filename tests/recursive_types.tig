@@ -1,0 +1,5 @@
+let
+   type f = f -> int
+in
+   0
+end
