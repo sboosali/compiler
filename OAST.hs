@@ -19,34 +19,24 @@ data Op = Add
         | Or
   deriving Show
 
-type Gensym = Int
+data Optimization = TailCall 
+
+type Gensym = String
 type Scope = Int
+data Identifer = Escaped Gensym Scope | Unescaped Gensym         
 
-
-            -- (for the one codegen we've implemented, i.e. MIPS)
-            -- offset from stack frame, stack frames up (0=current,1=parents,etc.)
-            -- unique ids:
-            -- a new fundef 'resets' the stack frames up
-            -- i.e. new vars are of the form [0,1...] 
-            -- while old vals take on the form [sfu+1,i]
-            -- so only keep track of 'current offset' (which is reset to 0 with each new fundef)
-            -- and map ids to [offset,sf] pairs (where offset is offset+1 for each new fundef)
-
-data Optimization = TailCall -- TCO -- any function that ends EITHER in a funcall OR an expression pristine of any funcalls (using type info)
-                  | EscapingFor -- for that mutates incrementee
-
--- (String is original var name, for human-readable assembly / debugging)
-data Identifer = Outer String OuterOffset Gensym Scope  -- 'scope' stack frames up, using the static links  
-               | Inner String Gensym         
-
-data Decl = FunDec Identifier [Identifier] Expr [Identifier] [Optimization]
+type EscapedVars = [Identifier]
+type UnescapedVars = [Identifier]
+data Decl = FunDec Identifier [Identifier] Expr EscapedVars UnescapedVars [Optimization]
           | VarDec Identifier Expr
   deriving Show
+
 data Expr = Nil
           | Break
           | Num Int
           | Str String
-          | Id Identifer          | Binop Op Expr Expr
+          | Id Identifer
+          | Binop Op Expr Expr
           | Negate Expr 
           | Seq [Expr]
           | Assign Expr Expr [Optimization]  
