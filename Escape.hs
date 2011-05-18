@@ -66,6 +66,7 @@ unique tree = runST $ do counter <- newSTRef 0
                                                                                            return $ O.Let (O.VarDec var oexpr : new_decs)
                                                                                                           new_expr
                                                                                                           []
+                             unique' table (Let ((TypedFunDec id args _ body):decs) exprs) = unique' table (Let ((UntypedFunDec id args body):decs) exprs)
                              unique' table (Let ((UntypedFunDec id args body):decs) exprs) = do let n = length args
                                                                                                 modifySTRef counter (+1)
                                                                                                 suf <- readSTRef counter
@@ -96,3 +97,21 @@ unique tree = runST $ do counter <- newSTRef 0
 
 
 
+escape :: [[ID]] -> O.Expr -> O.Expr
+escape O.Nil = O.Nil
+escape O.Break = O.Break
+escape (O.Num n) = O.Num n
+escape (O.Str s) = O.Str s
+escape (O.Id ident) = 0
+escape (O.Binop op e1 e2)
+escape (O.Negate e) = 
+          | Seq [Expr]
+          | Assign Expr Expr [Optimization]  
+          | Let [Decl] Expr [Optimization]  
+          | RecordCreation Expr Int [Expr]
+          | ArrayCreation Expr Expr [Optimization]  
+          | ArrayRef Expr Expr [Optimization] 
+          | While Expr Expr [Optimization] 
+          | For Identifier Expr Expr Expr  [Optimization]
+          | If Expr Expr Expr [Optimization]   
+          | Funcall Expr [Expr] [Optimization] 
