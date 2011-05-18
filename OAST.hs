@@ -30,7 +30,7 @@ data Expr = Nil
           | Negate Expr 
           | Seq [Expr]
           | Assign Expr Expr [Optimization]  
-          | Let [Decl] [Expr] [Optimization]  
+          | Let [Decl] Expr [Optimization]  
           | RecordCreation Expr Int [Expr]
           | ArrayCreation Expr Expr [Optimization]  
           | ArrayRef Expr Expr [Optimization] 
