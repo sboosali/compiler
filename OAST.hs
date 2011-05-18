@@ -1,29 +1,19 @@
 module OAST where
+import AST(Op)
 
 {-
 throw away types 
 records & fields -> arrays & offets
 -}
 
-data Op = Add
-        | Multiply
-        | Subtract
-        | Divide
-        | LessThan
-        | LessEq
-        | Equals
-        | NotEq
-        | GreaterThan
-        | GreaterEq
-        | And
-        | Or
-  deriving Show
 
-data Optimization = TailCall 
+
+data Optimization = TailCall deriving (Eq, Show)
 
 type Gensym = String
 type Scope = Int
-data Identifer = Escaped Gensym Scope | Unescaped Gensym         
+data Identifier = Escaped Gensym Scope | Unescaped Gensym
+                deriving (Eq, Show)
 
 type EscapedVars = [Identifier]
 type UnescapedVars = [Identifier]
@@ -35,7 +25,7 @@ data Expr = Nil
           | Break
           | Num Int
           | Str String
-          | Id Identifer
+          | Id Identifier
           | Binop Op Expr Expr
           | Negate Expr 
           | Seq [Expr]
@@ -45,7 +35,7 @@ data Expr = Nil
           | ArrayCreation Expr Expr [Optimization]  
           | ArrayRef Expr Expr [Optimization] 
           | While Expr Expr [Optimization] 
-          | For Identifer Expr Expr Expr  [Optimization]
+          | For Identifier Expr Expr Expr  [Optimization]
           | If Expr Expr Expr [Optimization]   
           | Funcall Expr [Expr] [Optimization]  
   deriving Show
