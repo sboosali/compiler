@@ -27,7 +27,6 @@ data Expr = Nil
           | Str String
           | Id Identifier
           | Binop Op Expr Expr
-          | Negate Expr 
           | Seq [Expr]
           | Assign Expr Expr [Optimization]  
           | Let [Decl] Expr [Optimization]  
