@@ -1,3 +1,4 @@
+{-# LANGUAGE PackageImports #-}
 module IR where
 
 import OAST
@@ -5,7 +6,7 @@ import Data.Char
 import Prelude hiding (lookup, LT, EQ, GT, error)
 import Data.Map (Map, insert, lookup, empty)
 import Control.Monad (mapM, mapM_, foldM_)
-import Control.Monad.State
+import "mtl" Control.Monad.State
 import IRSig
 import Op
 
@@ -324,9 +325,9 @@ translate' (If c t f _) =
 
 translate' (Funcall name args _) = 
     do ret <- mem
-       let f = toMem name
-       let as = map toMem args
-       addInstr $ Call f as ret 
+       f <- translate' name
+       args <- mapM translate' args
+       addInstr $ Call f args ret 
        return ret
 
 ------------------------------------------------

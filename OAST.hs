@@ -34,6 +34,6 @@ data Expr = Nil
           | While Expr Expr [Optimization] 
           | For Identifier Expr Expr Expr  [Optimization]
           | If Expr Expr Expr [Optimization]   
-          | Funcall Identifier [Identifier] [Optimization]  
+          | Funcall Expr [Expr] [Optimization]  
   deriving Show
 

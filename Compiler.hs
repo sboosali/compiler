@@ -3,7 +3,9 @@ module Main where
 import Parser
 import Lexer
 import Semantic
---import Escape
+import Escape
+import IR
+import Codegen
 
 import System
 import IO
@@ -14,7 +16,7 @@ main = do
   text <- if null args
           then hGetContents stdin
           else readFile $ head args 
-  let ast = parse $ tokenize text
-  print ast
-  print $ semantic ast
-  
+  let (t, ast) = semantic $ parse $ tokenize text
+      canonical = escape $ unique $ ast
+      (fundefs, instrs) = translate canonical
+  codegen instrs fundefs  
