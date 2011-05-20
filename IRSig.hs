@@ -44,7 +44,8 @@ toRelopEnum GreaterThan = GT
 toRelopEnum GreaterEq = GE
 
 data Val = Const Int 
-         | Mem Gensym 
+         | Mem Gensym
+         | MemScope Gensym Int -- Scope
          | MemOffset Val Val
          deriving Show
 
@@ -55,7 +56,6 @@ data Val = Const Int
 -- MemOffset Gensym Gensym (as opposed to MemOffset Gensym Int) allows IR to avoid doing pointer arithmetic, and to not deal with dereferncing (i.e. pointer / value dichotomy).
 
 type Offset = Val
-type Scope = Int
 type Size = Val   
 type Dest = Val
 type Src = Val

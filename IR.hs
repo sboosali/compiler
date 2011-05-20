@@ -7,6 +7,7 @@ import Data.Map (Map, insert, lookup, empty)
 import Control.Monad (mapM, mapM_, foldM_)
 import Control.Monad.State
 import IRSig
+import Op
 
 -- =|=|=|=|=|=|=|=|=|=|=|=|=|=|=|=|=|=|=|=|=|=|=|=|=|=|=|=|=|=|=|=|=|=|=|=|=
 -- TRANSLATE' |=|=|=|=|=|=|=|=|=|=|=|=|=|=|=|=|=|=|=|=|=|=|=|=|=|=|=|=|=|=|=
@@ -28,7 +29,8 @@ inc :: Val -> TAC
 inc m = BinopInstr PLUS m m (Const 1)
 
 toMem :: Identifier -> Val
-toMem = Mem . getGensym
+toMem (Escaped gs scope) = MemScope gs scope
+toMem (Unescaped gs) = Mem gs 
 
 type StreamT = [Int]
 type BreakpointsT = [Label]
@@ -75,9 +77,8 @@ initState :: Context
 initState = Context [] [] (nats begin) [exit] 
 
 getGensym :: Identifier -> String
-getGensym (Escaped i _) = i
-getGensym (Unescaped i) = i
-getGensym i = fail $ "saw: " ++ show i
+getGensym (Escaped gs scope) = gs
+getGensym (Unescaped gs) = gs 
 
 -------------------------------------------------------------------
 -- translate
@@ -86,6 +87,8 @@ translate e = let c = execState (translate' e) initState
                   functionDefinitions = fundefs c
                   program = reverse $ tacs c 
               in (functionDefinitions, program)
+
+getProgram = snd . translate
 
 -------------------------------------------------------------------
 -- translateD
@@ -132,20 +135,6 @@ translate' (Binop op e1 e2) = do dest <- mem
 translate' (Str s) = do addr <- mem
                         addInstr $ AllocateString s addr
                         return addr
-{-
-    do s <- mem
-       let ascii_string = map ord s
-       let len = length ascii_string
-       let offsets = map Const [1..len]
-
-       addInstr $ Malloc len s
-       addInstr $ Move s (Const len) 
-
-       let writeChar (i, ascii_char) = do addInstr $ Move (MemOffset s i) ascii_char
-       mapM_ writeChar offsets ascii_string
-       
-       return s
--}
 
 translate' (Seq es) = do es <- mapM translate' es
                          return $ head $ reverse $ es 
@@ -153,14 +142,6 @@ translate' (Seq es) = do es <- mapM translate' es
 translate' (Let decls expr _) = do mapM_ translateD decls
                                    body <- translate' expr   
                                    return body
-
-translate' (Assign lval rval _) = 
-    do let lhs = translateAssign lval
-       rhs <- translate' rval
-       addInstr $ Move lhs rhs
-       return void
-    where translateAssign (Id i) = toMem i
-          translateAssign (ArrayRef array offset _) = MemOffset (translateAssign array) offset
 
 translate' (RecordCreation fields) = 
     do record <- mem
@@ -304,3 +285,30 @@ translate' (Funcall name args _) =
        let as = map toMem args
        addInstr $ Call f as ret 
        return ret
+
+translate' (Assign lval rval _) = 
+    do rhs <- translate' rval
+       lhs <- computeLval lval
+       addInstr $ Move lhs rhs
+       return void
+    where computeLval :: Expr -> State Context Val
+          computeLval (Id i) = return $ toMem i
+          computeLval (ArrayRef array offset _) = do offset <- translate' offset
+                                                     array <- computeLval array
+                                                     return $ MemOffset array offset
+
+------------------------------------------------
+-- testing
+x = Unescaped "g"
+i = Id x
+
+t = translate
+
+ai = ArrayRef (Id $ Unescaped "a;1") (Binop Add (Num 1) $ (Id $ Unescaped "i;2")) []
+aij =  ArrayRef ai (Id $ Unescaped "j;3") []
+stub = Assign aij (Num 1) [] 
+
+addition = Binop Add (Num 1) (Num 2)
+
+assignment = Assign i i []
+
