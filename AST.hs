@@ -1,4 +1,5 @@
 module AST where
+import Op
 
 data Token = TokenInteger Int
            | TokenString String
@@ -48,19 +49,6 @@ data Token = TokenInteger Int
   deriving (Show, Ord, Eq)
 
 -- AST
-data Op = Add
-        | Multiply
-        | Subtract
-        | Divide
-        | LessThan
-        | LessEq
-        | Equals
-        | NotEq
-        | GreaterThan
-        | GreaterEq
-        | And
-        | Or
-  deriving Show
 
 type ID = String
 type TypeID = String

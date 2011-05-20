@@ -1,5 +1,5 @@
 module OAST where
-import AST(Op)
+import Op
 
 {-
 throw away types 
