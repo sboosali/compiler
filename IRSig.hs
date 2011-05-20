@@ -73,6 +73,8 @@ data FunDef = FunDef Label [Val] [TAC]
 
 data ErrorCode = Array_out_of_bounds | Nil_pointer_dereference | Nil_pointer_assignment deriving Show
 
+data Chunking = Enter | Exit deriving Show
+
 data TAC = LabelDecl Label
  | Malloc Val Val -- Malloc size location
  | AllocateString String Val
@@ -95,5 +97,7 @@ data TAC = LabelDecl Label
 
  | Call Fun [Arg] Dest
  | Return Val
+
+ | Comment Chunking Expr
    deriving Show
            
