@@ -43,10 +43,17 @@ empty :: SymbolTable
 empty = SymbolTable M.empty M.empty
 
 builtins :: SymbolTable
-builtins = let values = [("print",   FunctionT [StrT] VoidT),
-                         ("exit",    FunctionT [NumT] VoidT),
-                         ("itoa",    FunctionT [NumT] StrT),
-                         ("getchar", FunctionT []     StrT)]
+builtins = let values = [("print",     FunctionT [StrT]           VoidT),
+                         ("exit",      FunctionT [NumT]           VoidT),
+                         ("itoa",      FunctionT [NumT]           StrT),
+                         ("getchar",   FunctionT []               StrT),
+                         ("ord",       FunctionT [StrT]           NumT),
+                         ("chr",       FunctionT [NumT]           StrT),
+                         ("size",      FunctionT [StrT]           NumT),
+                         ("not",       FunctionT [NumT]           NumT),
+                         ("flush",     FunctionT []               VoidT),
+                         ("concat",    FunctionT [StrT,StrT]      StrT),
+                         ("substring", FunctionT [StrT,NumT,NumT] StrT)]
                types  = [("int",    NumT),
                          ("string", StrT)]
                valueMap = foldr (\(n,t) -> M.insert n t) M.empty values
@@ -105,7 +112,9 @@ semantic tree = runST $ do cmpCounter <- newSTRef 0
                                                                                                 VoidT
                                                                         return (VoidT, For id from to body)
 
-                               type_of table (Assign lv rv) = undefined
+                               type_of table (Assign lv rv) = do (_, lv) <- type_of table lv
+                                                                 (_, rv) <- type_of table rv
+                                                                 return (VoidT, Assign lv rv)
 
                                type_of table (If c t e) = do (_, c) <- type_check table c NumT
                                                              (thenT, t) <- type_of table t

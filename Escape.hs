@@ -187,8 +187,8 @@ escape tree = runST $ do escapedVars <- newSTRef S.empty
                              escape' env (O.Let ((O.VarDec id val):decs) expr opt) = do val <- escape' env val
                                                                                         let O.Undecided varname = id
                                                                                             new_env = extend varname env
-                                                                                        O.Let _ expr opt <- escape' new_env (O.Let decs expr opt)
-                                                                                        return $ O.Let decs expr opt
+                                                                                        O.Let decs expr opt <- escape' new_env (O.Let decs expr opt)
+                                                                                        return $ O.Let ((O.VarDec id val):decs) expr opt
                              escape' env (O.Let ((O.FunDec id args body opt1):decs) expr opt) = do let body_env = foldr (extend . getName) (S.empty : env) (id:args)
                                                                                                    body <- escape' body_env body
                                                                                                    let new_env = extend (getName id) env

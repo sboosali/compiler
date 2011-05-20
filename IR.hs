@@ -85,7 +85,7 @@ mem = do n <- gensym
 
 label :: String -> State Context Label
 label name = do n <- gensym
-                return $ Label (name ++ "@" ++ show n)
+                return $ Label (name ++ "$$" ++ show n)
 
 nats :: Int -> [Int]
 nats n = n : nats (n+1)
@@ -238,6 +238,7 @@ translate' (ArrayCreation size init _) =
     do --comment Enter "ArrayCreation"
 
        size <- translate' size
+       size <- inc size
        init <- translate' init
        i <- mem
        array <- mem
@@ -253,7 +254,7 @@ translate' (ArrayCreation size init _) =
        addInstr $ Cjump LT i size body end -- i<size
        addLabel body
        addInstr $ Move (MemOffset array i) init -- array[i]=val
-       inc <- inc i -- i++
+       i <- inc i -- i++
        addLabel end
 
        --comment Exit "ArrayCreation"

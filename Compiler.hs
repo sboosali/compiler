@@ -25,11 +25,9 @@ main = do
 
 
 
-debug = do
+debug f = do
   args <- System.getArgs
-  text <- if null args
-          then hGetContents stdin
-          else readFile $ head args 
+  text <- readFile f
   let (t, ast) = semantic $ parse $ tokenize text
       canonical = escape $ unique $ ast
       (fundefs, instrs) = translate canonical

@@ -88,12 +88,12 @@ instance Show Register where
 -}
 codegen :: [TAC] -> [FunDef] -> IO ()
 codegen instrs fs = do memory <- H.new (==) H.hashString
-                       H.insert memory "x;1" 7 -- DUMMY VALUE
                        let codegen' :: TAC -> IO ()
                            codegen' (LabelDecl l) = write $ makeLabelInstr l
                            codegen' (Comment Enter s) = write $ "# (" ++ s
                            codegen' (Comment Exit  s) = write $ "# " ++ s ++ ")"
                            codegen' (Malloc size dest) = do moveToReg size A0
+                                                            write $ "mul $a0, $a0, 4"
                                                             write $ "sub $sp, $sp, 16"
                                                             write $ "jal malloc"
                                                             write $ "add $sp, $sp, 16"
@@ -110,7 +110,7 @@ codegen instrs fs = do memory <- H.new (==) H.hashString
                                                                    forM (zip [4..] ascii_string) $ \(offset, chr) -> do
                                                                      write $ "li $t0, " ++ show chr
                                                                      write $ "sb $t0, " ++ show offset ++ "($v0)"
-                                                                   moveToReg dest V0
+                                                                   moveToVal dest V0
         
                            codegen' (BinopInstr op d s1 s2) = do moveToReg s1 T1
                                                                  moveToReg s2 T2
@@ -140,7 +140,7 @@ codegen instrs fs = do memory <- H.new (==) H.hashString
                                                                  moveToReg arg reg
                                                              -- push all of the args on the stack (backwards)
                                                              write $ "sub $sp, $sp, " ++ show (4 * length args)
-                                                             forM_ (zip (reverse args) [4,8..]) $ \(arg, offset) -> do
+                                                             forM_ (zip args [4,8..]) $ \(arg, offset) -> do
                                                                  moveToReg arg T1 -- $t0 is in use
                                                                  write $ "sw $t1, " ++ show offset ++ "($sp)"
                                                              -- call the function
@@ -192,7 +192,7 @@ codegen instrs fs = do memory <- H.new (==) H.hashString
                            moveToReg (MemOffset v1 v2) reg = do moveToReg v1 T1
                                                                 moveToReg v2 T2
                                                                 write $ "move $t6, $t1"
-                                                                write $ "move $t5, $t2"
+                                                                write $ "mul $t5, $t2, 4"
                                                                 write $ "add $t4, $t5, $t6"
                                                                 write $ "lw " ++ show reg ++ ", ($t4)"
 
@@ -213,7 +213,7 @@ codegen instrs fs = do memory <- H.new (==) H.hashString
                            moveToVal (MemOffset v1 v2) reg = do moveToReg v1 T1
                                                                 moveToReg v2 T2
                                                                 write $ "move $t6, $t1"
-                                                                write $ "move $t5, $t2"
+                                                                write $ "mul $t5, $t2, 4"
                                                                 write $ "add $t4, $t5, $t6"
                                                                 write $ "sw " ++ show reg ++ ", ($t4)"
 
@@ -224,6 +224,10 @@ codegen instrs fs = do memory <- H.new (==) H.hashString
                                                                                              
                            escaped (MemScope _ 0) = True
                            escaped _              = False
+
+                           builtin (Mem s) = "builtin$" `isPrefixOf` s
+                           builtin (MemScope s 0) = "builtin$" `isPrefixOf` s
+                           builtin _ = False
         
                            extract_unescaped (Malloc v1 v2) = filter unescaped [v1,v2]
                            extract_unescaped (AllocateString _ v) = filter unescaped [v]
@@ -237,7 +241,7 @@ codegen instrs fs = do memory <- H.new (==) H.hashString
                            extract_unescaped _ = []
         
                            extract_escaped (Malloc v1 v2) = filter escaped [v1,v2]
-                           extract_escaped (AllocateString _ v) = filter escaped []
+                           extract_escaped (AllocateString _ v) = filter escaped [v]
                            extract_escaped (BinopInstr _ d s1 s2) = filter escaped [d,s1,s2]
                            extract_escaped (Relop      _ d s1 s2) = filter escaped [d,s1,s2]
                            extract_escaped (Cjump _ s1 s2 _ _) = filter escaped [s1,s2]
@@ -246,6 +250,17 @@ codegen instrs fs = do memory <- H.new (==) H.hashString
                            extract_escaped (MakeClosure ptr _) = filter escaped [ptr]
                            extract_escaped (Return v) = filter escaped [v]
                            extract_escaped _ = []
+        
+                           extract_builtins (Malloc v1 v2) = filter builtin [v1,v2]
+                           extract_builtins (AllocateString _ v) = filter builtin [v]
+                           extract_builtins (BinopInstr _ d s1 s2) = filter builtin [d,s1,s2]
+                           extract_builtins (Relop      _ d s1 s2) = filter builtin [d,s1,s2]
+                           extract_builtins (Cjump _ s1 s2 _ _) = filter builtin [s1,s2]
+                           extract_builtins (Move d s) = filter builtin [d,s]
+                           extract_builtins (Call f args r) = filter builtin $ [f,r] ++ args
+                           extract_builtins (MakeClosure ptr _) = filter builtin [ptr]
+                           extract_builtins (Return v) = filter builtin [v]
+                           extract_builtins _ = []
         
                            initializeFunDef (FunDef lbl args instrs) = let unescaped_mems = S.fromList $ filter unescaped args ++ concatMap extract_unescaped instrs
                                                                            escaped_mems = S.fromList $ filter escaped args ++ concatMap extract_escaped instrs
@@ -259,6 +274,7 @@ codegen instrs fs = do memory <- H.new (==) H.hashString
         
                            processFunDef (FunDef lbl args instrs) = do let unescaped_mems = S.fromList $ filter unescaped args ++ concatMap extract_unescaped instrs
                                                                            escaped_mems = S.fromList $ filter escaped args ++ concatMap extract_escaped instrs
+                                                                       write $ ""
                                                                        write $ makeLabelInstr lbl
                                                                        -- Allocate stack space
                                                                        write $ "sub $sp, $sp, " ++ show (12 + 4 * S.size unescaped_mems)
@@ -275,10 +291,11 @@ codegen instrs fs = do memory <- H.new (==) H.hashString
                                                                        write $ "lw $t0, 4($fp)" -- t0 now has the pointer
                                                                        write $ "sw $v0, 4($fp)" -- 4($fp) now has the EVR
                                                                        write $ "sw $t0, ($v0)"  -- the first element of the EVR is the parent pointer
-           
-                                                                       forM (zip args [12 + 4 * S.size unescaped_mems, 16 + 4 * S.size unescaped_mems ..]) $ \(arg, off) -> do
-                                                                         write $ "lw $t1, " ++ show off ++ "($sp)"
+                                                                       write $ " # Reading arguments"
+                                                                       forM (zip args [16 + 4 * S.size unescaped_mems, 20 + 4 * S.size unescaped_mems ..]) $ \(arg, off) -> do
+                                                                         write $ "lw $t1, " ++ show off ++ "($fp)"
                                                                          moveToVal arg T1
+                                                                       write $ " # Done reading arguments; writing function body"
                                                                              
                                                                        mapM codegen' instrs  -- actually write out the code
    
@@ -287,6 +304,7 @@ codegen instrs fs = do memory <- H.new (==) H.hashString
                                                                        write $ "lw $fp, 8($sp)"
                                                                        write $ "add $sp, $sp, " ++ show (12 + 4 * S.size unescaped_mems)
                                                                        write $ "jr $ra"
+                                                                       write $ ""
                        -- Main label
                        -- Prepend header file:
                        header <- readFile "lib/stdlib.s" -- yuck!
@@ -298,6 +316,7 @@ codegen instrs fs = do memory <- H.new (==) H.hashString
         
                        let unescaped_mems = S.fromList $ concatMap extract_unescaped instrs
                            escaped_mems = S.fromList $ concatMap extract_escaped instrs
+                           declared_builtins = S.toList $ S.fromList $ concatMap extract_builtins instrs
                        forM (zip (S.elems escaped_mems) [4,8..]) $ \(MemScope id 0, offset) ->
                            H.insert memory id offset
                        -- 4($fp) is the pointer to the escaped value record
@@ -317,9 +336,16 @@ codegen instrs fs = do memory <- H.new (==) H.hashString
                        write $ "add $sp, $sp, 16"
                        
                        write $ "sw $v0, 4($fp)" -- 4($fp) now has the EVR
+                       
+                       write $ "\n# Allocating builtins"
+                       forM_ declared_builtins $ \v -> case v of
+                                                         Mem s -> codegen' (MakeClosure v (Label s))
+                                                         MemScope s _ -> codegen' (MakeClosure v (Label s))
 
+                       write $ "# Done allocating builtins"
+                       write $ "\n# Writing top-level code"
                        mapM_ codegen' instrs
-
+                       write $ "# Done writing top-level code\n"
 
                        -- Deallocate stack space
                        write $ "lw $ra, 12($sp)"
@@ -329,6 +355,7 @@ codegen instrs fs = do memory <- H.new (==) H.hashString
                        write $ "li $a0, 0"
                        write $ "jal a_exit"
 
+                       write $ "\n# Writing fundefs:"
                        -- Output function bodies
                        mapM_ processFunDef fs
 
