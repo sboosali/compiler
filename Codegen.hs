@@ -41,7 +41,7 @@ makeLabelInstr :: Label -> String
 makeLabelInstr l = show l ++ ":"
 
 makeTernaryInstr :: (Show a, Show b, Show c) => String -> a -> b -> c -> String
-makeTernaryInstr op s1 s2 s3 = op ++ " " ++ show s1 ++ " " ++ show s2 ++ " " ++ show s3
+makeTernaryInstr op s1 s2 s3 = op ++ " " ++ show s1 ++ ", " ++ show s2 ++ ", " ++ show s3
 
 makeJumpInstr :: Label -> String
 makeJumpInstr l = "j " ++ show l
@@ -91,6 +91,8 @@ codegen instrs fs = do memory <- H.new (==) H.hashString
                        H.insert memory "x;1" 7 -- DUMMY VALUE
                        let codegen' :: TAC -> IO ()
                            codegen' (LabelDecl l) = write $ makeLabelInstr l
+                           codegen' (Comment Enter s) = write $ "# (" ++ s
+                           codegen' (Comment Exit  s) = write $ "# " ++ s ++ ")"
                            codegen' (Malloc size dest) = do moveToReg size A0
                                                             write $ "sub $sp, $sp, 16"
                                                             write $ "jal malloc"
@@ -142,7 +144,7 @@ codegen instrs fs = do memory <- H.new (==) H.hashString
                                                                  moveToReg arg T1 -- $t0 is in use
                                                                  write $ "sw $t1, " ++ show offset ++ "($sp)"
                                                              -- call the function
-                                                             write $ "jalr ($t0)"
+                                                             write $ "jalr $t0"
                                                              write $ "add $sp, $sp, " ++ show (4 * length args)
                                                              -- write the returned value to the right place
                                                              moveToVal ret V0
@@ -169,7 +171,8 @@ codegen instrs fs = do memory <- H.new (==) H.hashString
                                                                     Nil_pointer_dereference -> 2
                                                                     Nil_pointer_assignment -> 3
                                                        write $ "li $a0, " ++ show code
-                                                       write $ "jal a_error"
+                           codegen' (Return src) = moveToReg src V0
+
         
                            write = putStrLn
                            
@@ -214,7 +217,7 @@ codegen instrs fs = do memory <- H.new (==) H.hashString
                                                                 write $ "add $t4, $t5, $t6"
                                                                 write $ "sw " ++ show reg ++ ", ($t4)"
 
-                           moveToVal (Const _) _ = fail $ "attempt to write into Const"
+                           moveToVal (Const _) _ = fail $ "codegen: attempt to write into Const"
         
                            unescaped (Mem _) = True
                            unescaped _       = False
@@ -285,13 +288,13 @@ codegen instrs fs = do memory <- H.new (==) H.hashString
                                                                        write $ "add $sp, $sp, " ++ show (12 + 4 * S.size unescaped_mems)
                                                                        write $ "jr $ra"
                        -- Main label
-                       -- Prepend the header file
-                       header <- readFile "lib/stdlib.s"
+                       -- Prepend header file:
+                       header <- readFile "lib/stdlib.s" -- yuck!
                        write $ header
                        write $ "main:"
                        
         
-                       mapM initializeFunDef fs
+                       mapM_ initializeFunDef fs
         
                        let unescaped_mems = S.fromList $ concatMap extract_unescaped instrs
                            escaped_mems = S.fromList $ concatMap extract_escaped instrs
@@ -325,4 +328,7 @@ codegen instrs fs = do memory <- H.new (==) H.hashString
 
                        write $ "li $a0, 0"
                        write $ "jal a_exit"
+
+                       -- Output function bodies
+                       mapM_ processFunDef fs
 

@@ -147,6 +147,8 @@ a_chr: #fix to exit if i is out of range
 a_exit:
 	sub $sp, $sp, 16
 	jal exit
+
+lerror:	jal a_error
 	
 a_error:
 	beq $a0, 0, ab_stdabort

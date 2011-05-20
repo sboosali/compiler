@@ -33,7 +33,7 @@ data Uniqueness = Numeric Int
                 | Builtin
 
 applyUnique :: Uniqueness -> ID -> O.Identifier
-applyUnique (Numeric suf) id = O.Undecided $ id ++ ';' : show suf
+applyUnique (Numeric suf) id = O.Undecided $ id ++ '.' : show suf
 applyUnique Builtin id = O.Undecided $ "builtin$" ++ id
 
 unique :: Expr -> O.Expr
