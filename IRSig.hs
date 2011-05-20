@@ -98,6 +98,6 @@ data TAC = LabelDecl Label
  | Call Fun [Arg] Dest
  | Return Val
 
- | Comment Chunking Expr
+ | Comment Chunking String -- Type
    deriving Show
            

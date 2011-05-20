@@ -95,6 +95,8 @@ getGensym :: Identifier -> String
 getGensym (Escaped gs scope) = gs
 getGensym (Unescaped gs) = gs 
 
+comment chunking expr = do addInstr $ Comment chunking expr
+
 -------------------------------------------------------------------
 -- translate
 translate :: Expr -> ([FunDef],[TAC])
@@ -143,28 +145,42 @@ translate' (Nil) = do return nil
 translate' (Break) = do c <- get
                         addInstr $ Jump $ head $ bs c
                         return nil
-translate' (Binop op e1 e2) = do dest <- mem
+translate' (Binop op e1 e2) = do comment Enter "Binop"
+
+                                 dest <- mem
                                  src1 <- translate' e1
                                  src2 <- translate' e2
                                  addInstr $ BinopInstr (toBinopEnum op) dest src1 src2
+
+                                 comment Exit "Binop"
                                  return dest
 
-translate' (Str s) = do addr <- mem
+translate' (Str s) = do comment Enter "Str"
+                        addr <- mem
                         addInstr $ AllocateString s addr
+                        comment Exit "Str"
                         return addr
 
-translate' (Seq es) = do es <- mapM translate' es
+translate' (Seq es) = do comment Enter "Seq"
+                         es <- mapM translate' es
+                         comment Exit "Seq"
                          return $ head $ reverse $ es 
 
-translate' (Let decls expr _) = do mapM_ translateD decls
-                                   body <- translate' expr   
+translate' (Let decls expr _) = do comment Enter "Let"
+                                   mapM_ translateD decls
+                                   body <- translate' expr 
+                                   comment Exit "Let" 
                                    return body
 
 translate' (Assign lval rval _) = 
-    do rhs <- translate' rval
+    do comment Enter "Assign"
+
+       rhs <- translate' rval
        lhs <- computeLval lval
 
        addInstr $ Move lhs rhs
+
+       comment Exit "Assign"
        return void
 
     where computeLval :: Expr -> State Context Val
@@ -181,7 +197,9 @@ translate' (Assign lval rval _) =
                                                      return $ MemOffset array offset
 
 translate' (ArrayRef array offset _) = 
-    do array <- translate' array -- array[0] => size
+    do comment Enter "ArrayRef"
+
+       array <- translate' array -- array[0] => size
        offset <- translate' offset
        stay1 <- label "stay1"
        stay2 <- label "stay2"
@@ -196,21 +214,28 @@ translate' (ArrayRef array offset _) =
        addInstr $ Cjump GE offset array error stay2
 
        addLabel stay2
-       addInstr $ inc offset -- tiger_array[i] is actually assembly_array[i+1]        
+       addInstr $ inc offset -- tiger_array[i] is actually assembly_array[i+1]
+ 
+       comment Exit "ArrayRef"       
        return $ MemOffset array offset
 
 translate' (RecordCreation fields) = 
-    do record <- mem
+    do comment Enter "RecordCreation"
+
+       record <- mem
        locs <- mapM translate' fields
        let size = length locs       
 
        let mkField (field, i) = do addInstr $ Move (MemOffset record (Const i)) field
        mapM_ mkField $ zip locs [0..size-1]
 
+       comment Exit "RecordCreation"
        return record
               
 translate' (ArrayCreation size init _) = 
-    do size <- translate' size
+    do comment Enter "ArrayCreation"
+
+       size <- translate' size
        init <- translate' init
        i <- mem
        array <- mem
@@ -229,10 +254,13 @@ translate' (ArrayCreation size init _) =
        addInstr $ inc i -- i++
        addLabel end
 
+       comment Exit "ArrayCreation"
        return array
 
 translate' (For identifier low high body _) = 
-    do array <- mem
+    do comment Enter "For"
+
+       array <- mem
        offset <- mem
        size <- mem
 
@@ -275,10 +303,13 @@ translate' (For identifier low high body _) =
 
        popBreakpoint
 
+       comment Exit "For"
        return void
 
 translate' (While cond body _) = 
-    do while_cond <- label "while_cond"
+    do comment Enter "While"
+
+       while_cond <- label "while_cond"
        while_body <- label "while_body"
        while_end <- label "while_end"
 
@@ -296,10 +327,13 @@ translate' (While cond body _) =
 
        popBreakpoint      
 
+       comment Exit "While"
        return void
 
 translate' (If c t f _) = 
-    do true_branch <- label "if_true"
+    do comment Enter "If"
+
+       true_branch <- label "if_true"
        false_branch <- label "if_false"
        end <- label "if_end"
        ret <- mem
@@ -320,13 +354,18 @@ translate' (If c t f _) =
 
        addLabel end
 
+       comment Exit "If"
        return ret
 
 translate' (Funcall name args _) = 
-    do ret <- mem
+    do comment Enter "Funcall"
+
+       ret <- mem
        f <- translate' name
        args <- mapM translate' args
        addInstr $ Call f args ret 
+       
+       comment Exit "Funcall"
        return ret
 
 ------------------------------------------------
