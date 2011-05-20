@@ -1,4 +1,4 @@
-module AST where
+module AST(module AST, module Op) where
 import Op
 
 data Token = TokenInteger Int
