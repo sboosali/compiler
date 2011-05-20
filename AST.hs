@@ -49,10 +49,8 @@ data Token = TokenInteger Int
   deriving (Show, Ord, Eq)
 
 -- AST
-
 type ID = String
 type TypeID = String
-
 data SyntacticType = VarST TypeID
                    | ArrayST TypeID
                    | RecordST [(ID, TypeID)]

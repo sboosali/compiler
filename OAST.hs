@@ -6,18 +6,17 @@ throw away types
 records & fields -> arrays & offets
 -}
 
+data A = B deriving Show
 
-
-data Optimization = TailCall deriving (Eq, Show)
+data Optimization = TailCall 
+                  deriving Show
 
 type Gensym = String
 type Scope = Int
-data Identifier = Escaped Gensym Scope | Unescaped Gensym
-                deriving (Eq, Show)
+data Identifier = Escaped Gensym Scope | Unescaped Gensym | Undecided Gensym
+            deriving Show
 
-type EscapedVars = [Identifier]
-type UnescapedVars = [Identifier]
-data Decl = FunDec Identifier [Identifier] Expr EscapedVars UnescapedVars [Optimization]
+data Decl = FunDec Identifier [Identifier] Expr [Optimization]
           | VarDec Identifier Expr
   deriving Show
 
@@ -27,14 +26,16 @@ data Expr = Nil
           | Str String
           | Id Identifier
           | Binop Op Expr Expr
+          | Negate Expr 
           | Seq [Expr]
           | Assign Expr Expr [Optimization]  
           | Let [Decl] Expr [Optimization]  
-          | RecordCreation Expr Int [Expr]
+          | RecordCreation [Expr]
           | ArrayCreation Expr Expr [Optimization]  
           | ArrayRef Expr Expr [Optimization] 
           | While Expr Expr [Optimization] 
           | For Identifier Expr Expr Expr  [Optimization]
           | If Expr Expr Expr [Optimization]   
-          | Funcall Expr [Expr] [Optimization]  
+          | Funcall Identifier [Identifier] [Optimization]  
   deriving Show
+
