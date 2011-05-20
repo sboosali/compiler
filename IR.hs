@@ -2,11 +2,12 @@ module IR where
 
 import OAST
 import Data.Char 
-import Prelude hiding (lookup, LT, EQ, GT)
+import Prelude hiding (lookup, LT, EQ, GT, error)
 import Data.Map (Map, insert, lookup, empty)
 import Control.Monad (mapM, mapM_, foldM_)
 import Control.Monad.State
 import IRSig
+import Op
 
 -- =|=|=|=|=|=|=|=|=|=|=|=|=|=|=|=|=|=|=|=|=|=|=|=|=|=|=|=|=|=|=|=|=|=|=|=|=
 -- TRANSLATE' |=|=|=|=|=|=|=|=|=|=|=|=|=|=|=|=|=|=|=|=|=|=|=|=|=|=|=|=|=|=|=
@@ -19,16 +20,32 @@ import IRSig
 ------------------------------------------------------------------- 
 -- helpers
 
-nil = Mem "internal_nil$1"
-void = Mem "internal_void$2"
-exit = Label "internal_exit$3"
-begin = 4
+-- Stdlib
+
+prefix = "a_"
+
+print = Label $ prefix++"print"
+flush = Label $ prefix++"flush"
+getChar = Label $ prefix++"getChar"
+chr = Label $ prefix++"chr"
+size = Label $ prefix++"size"
+substring = Label $ prefix++"substring"
+concat = Label $ prefix++"concat"
+not = Label $ prefix++"not"
+exit = Label $ prefix++"exit"
+error = Label $ prefix++"error"
+
+--
+
+nil = Const 0
+void = Mem "" -- shouldn't be used, just for type checking
 
 inc :: Val -> TAC
 inc m = BinopInstr PLUS m m (Const 1)
 
 toMem :: Identifier -> Val
-toMem = Mem . getGensym
+toMem (Escaped gs scope) = MemScope gs scope
+toMem (Unescaped gs) = Mem gs 
 
 type StreamT = [Int]
 type BreakpointsT = [Label]
@@ -72,12 +89,11 @@ nats :: Int -> [Int]
 nats n = n : nats (n+1)
 
 initState :: Context 
-initState = Context [] [] (nats begin) [exit] 
+initState = Context [] [] (nats 0) [exit] 
 
 getGensym :: Identifier -> String
-getGensym (Escaped i _) = i
-getGensym (Unescaped i) = i
-getGensym i = fail $ "saw: " ++ show i
+getGensym (Escaped gs scope) = gs
+getGensym (Unescaped gs) = gs 
 
 -------------------------------------------------------------------
 -- translate
@@ -87,6 +103,9 @@ translate e = let c = execState (translate' e) initState
                   program = reverse $ tacs c 
               in (functionDefinitions, program)
 
+getFundefs = fst . translate
+getProgram = snd . translate
+
 -------------------------------------------------------------------
 -- translateD
 translateD :: Decl -> State Context Val
@@ -94,16 +113,16 @@ translateD (VarDec name e) =
     do let var = toMem name
        val <- translate' e
        addInstr $ Move var val
-       return var
+       return void
 
 translateD (FunDec name params body _) = 
     do c <- get
        let instructions = tacs c       
        put $ c {tacs = []} -- clear program instructions
        
-       translate' body 
+       ret <- translate' body 
        c <- get
-       let funBody = reverse $ tacs c
+       let funBody = reverse $ Return ret : tacs c
        let f = getGensym name
        
        let ps = map toMem params
@@ -112,14 +131,15 @@ translateD (FunDec name params body _) =
        put $ c {fundefs = functionDefinition : fundefs c, tacs = instructions} -- add fundef, then restore program instructions
 
        addInstr $ MakeClosure (Mem f) (Label f)
-       return $ Mem f
+       return void
+
 -------------------------------------------------------------------
 -- translate' 
 
 translate' :: Expr -> State Context Val
-translate' (Num n) = return $ Const n
-translate' (Id i) = return $ toMem i
-translate' (Nil) = return nil
+translate' (Num n) = do return $ Const n
+translate' (Id i) = do return $ toMem i
+translate' (Nil) = do return nil
 translate' (Break) = do c <- get
                         addInstr $ Jump $ head $ bs c
                         return nil
@@ -132,20 +152,6 @@ translate' (Binop op e1 e2) = do dest <- mem
 translate' (Str s) = do addr <- mem
                         addInstr $ AllocateString s addr
                         return addr
-{-
-    do s <- mem
-       let ascii_string = map ord s
-       let len = length ascii_string
-       let offsets = map Const [1..len]
-
-       addInstr $ Malloc len s
-       addInstr $ Move s (Const len) 
-
-       let writeChar (i, ascii_char) = do addInstr $ Move (MemOffset s i) ascii_char
-       mapM_ writeChar offsets ascii_string
-       
-       return s
--}
 
 translate' (Seq es) = do es <- mapM translate' es
                          return $ head $ reverse $ es 
@@ -155,12 +161,43 @@ translate' (Let decls expr _) = do mapM_ translateD decls
                                    return body
 
 translate' (Assign lval rval _) = 
-    do let lhs = translateAssign lval
-       rhs <- translate' rval
+    do rhs <- translate' rval
+       lhs <- computeLval lval
+
        addInstr $ Move lhs rhs
        return void
-    where translateAssign (Id i) = toMem i
-          translateAssign (ArrayRef array offset _) = MemOffset (translateAssign array) offset
+
+    where computeLval :: Expr -> State Context Val
+          computeLval (Id i) = do let left = toMem i
+                                  stay <- label "stay"
+                                  -- runtime check: assignment to nil pointer
+                                  addInstr $ Error Nil_pointer_assignment                                  
+                                  addInstr $ Cjump EQ left nil error stay
+                                  addLabel stay
+                                  return left
+
+          computeLval (ArrayRef array offset _) = do offset <- translate' offset
+                                                     array <- computeLval array
+                                                     return $ MemOffset array offset
+
+translate' (ArrayRef array offset _) = 
+    do array <- translate' array -- array[0] => size
+       offset <- translate' offset
+       stay1 <- label "stay1"
+       stay2 <- label "stay2"
+
+       -- runtime check: nil pointer derefence
+       addInstr $ Error Nil_pointer_dereference
+       addInstr $ Cjump EQ array nil error stay1
+
+       -- runtime check: array out of bounds       
+       addLabel stay1
+       addInstr $ Error Array_out_of_bounds
+       addInstr $ Cjump GE offset array error stay2
+
+       addLabel stay2
+       addInstr $ inc offset -- tiger_array[i] is actually assembly_array[i+1]        
+       return $ MemOffset array offset
 
 translate' (RecordCreation fields) = 
     do record <- mem
@@ -193,18 +230,6 @@ translate' (ArrayCreation size init _) =
        addLabel end
 
        return array
-
-translate' (ArrayRef array offset _) = 
-    do array <- translate' array -- 0th offset stores length
-       offset <- translate' offset
-       stay <- label "stay"
-
-       -- check for: array out of bounds
-       addInstr $ Cjump GE offset array exit stay
-
-       addLabel stay
-       addInstr $ inc offset -- tiger_array[i] is actually assembly_array[i+1]        
-       return $ MemOffset array offset
 
 translate' (For identifier low high body _) = 
     do array <- mem
@@ -252,7 +277,6 @@ translate' (For identifier low high body _) =
 
        return void
 
-
 translate' (While cond body _) = 
     do while_cond <- label "while_cond"
        while_body <- label "while_body"
@@ -270,9 +294,9 @@ translate' (While cond body _) =
 
        addLabel while_end
 
-       popBreakpoint
-       
-       return void     
+       popBreakpoint      
+
+       return void
 
 translate' (If c t f _) = 
     do true_branch <- label "if_true"
@@ -304,3 +328,19 @@ translate' (Funcall name args _) =
        let as = map toMem args
        addInstr $ Call f as ret 
        return ret
+
+------------------------------------------------
+-- testing
+x = Unescaped "g"
+i = Id x
+
+t = translate
+
+ai = ArrayRef (Id $ Unescaped "a;1") (Binop Add (Num 1) $ (Id $ Unescaped "i;2")) []
+aij =  ArrayRef ai (Id $ Unescaped "j;3") []
+stub = Assign aij (Num 1) [] 
+
+addition = Binop Add (Num 1) (Num 2)
+
+assignment = Assign i i []
+

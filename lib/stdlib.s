@@ -1,6 +1,25 @@
+.data
+	outofbounds: .asciiz "Aborting: Out-of-bounds error\n"
+	nullpointerdereference: .asciiz "Aborting: Null-pointer dereference\n"
+	nullpointerassignment: .asciiz "Aborting: Null-pointer assignment\n"
+	stdabort: .asciiz "Aborting\n"
+	illegalcode: .asciiz "Aborting (WARNING: Illegal abort code supplied)\n"
+
 .text
 	
 .globl main
+
+# ***************************************************************************************************************
+# Subroutine: a_getchar
+# Read a character from standard input; return empty string on end of file
+#
+# Params: <none>
+# Returns: $v0 - a pointer to the string representing the character read in
+# 
+# Register Usage:
+# 
+#
+# ***************************************************************************************************************
 
 a_getchar:
 	sub $sp, $sp, 8
@@ -39,6 +58,18 @@ a_getchar:
 	add $sp, $sp, 8
 	jr $ra
 
+# ***************************************************************************************************************
+# Subroutine: a_ord
+# Returns the ASCII value of the first character of s; yields -1 if s is the empty string
+#
+# Params: $a0 - a pointer to the string whose first character we will returns
+# Returns: $v0 - a pointer to the string representing the character read in
+# 
+# Register Usage:
+# 
+#
+# ***************************************************************************************************************
+
 a_ord:
 	sub $sp, $sp, 4
 	sw $ra, 4($sp)
@@ -52,6 +83,18 @@ a_ord:
 	lw $ra, 4($sp)
 	add $sp, $sp, 4
 	jr $ra
+
+# ***************************************************************************************************************
+# Subroutine: a_print
+# Prints a string s on standard output
+#
+# Params: $a0 - a pointer to the string that will be printed
+# Returns: $v0 - a pointer to the string representing the character read in
+# 
+# Register Usage:
+# 
+#
+# ***************************************************************************************************************
 
 a_print:
 	sub $sp, $sp, 4
@@ -68,19 +111,11 @@ a_print:
 	jr $ra
 
 a_size:
-	sub $sp, $sp, 4
-	sw $ra, 4($sp)
 	lw $v0, ($a0)
-	lw $ra, 4($sp)
-	add $sp, $sp, 4
 	jr $ra
 	
 a_not:
-	sub $sp, $sp, 4
-	sw $ra, 4($sp)
 	seq $v0, $a0, 0
-	lw $ra, 4($sp)
-	add $sp, $sp, 4
 	jr $ra
 	
 a_chr: #fix to exit if i is out of range
@@ -91,11 +126,14 @@ a_chr: #fix to exit if i is out of range
 	blt $a0, 0, out_of_range
 	j in_range
 	out_of_range:
-		jal a_abort
+		li $a0, 1
+		jal a_error
 	in_range:
 	move $s0, $a0
 	li $a0, 6
+	sub $sp, $sp, 16
 	jal malloc
+	add $sp, $sp, 16
 	li $t0, 1
 	sw $t0, ($v0)
 	sb $s0, 4($v0)
@@ -110,15 +148,58 @@ a_exit:
 	sub $sp, $sp, 16
 	jal exit
 	
+a_error:
+	beq $a0, 0, ab_stdabort
+	beq $a0, 1, ab_outofbounds
+	beq $a0, 2, ab_nullpointerdereference
+	beq $a0, 3, ab_nullpointerassignment
+	j ab_illegalcode
+	ab_stdabort:
+		li $a0, 1	
+		la $a1, stdabort
+		li $a2, 9
+		sub $sp, $sp, 16
+		jal write
+		add $sp, $sp, 16
+		jal a_abort
+	ab_outofbounds:
+		li $a0, 1	
+		la $a1, outofbounds
+		li $a2, 30
+		sub $sp, $sp, 16
+		jal write
+		add $sp, $sp, 16
+		jal a_abort
+	ab_nullpointerdereference:
+		li $a0, 1	
+		la $a1, nullpointerdereference
+		li $a2, 35
+		sub $sp, $sp, 16
+		jal write
+		add $sp, $sp, 16
+		jal a_abort
+	ab_nullpointerassignment:
+		li $a0, 1	
+		la $a1, nullpointerassignment
+		li $a2, 34
+		sub $sp, $sp, 16
+		jal write
+		add $sp, $sp, 16
+		jal a_abort
+	ab_illegalcode:
+		li $a0, 1	
+		la $a1, illegalcode
+		li $a2, 48
+		sub $sp, $sp, 16
+		jal write
+		add $sp, $sp, 16
+		jal a_abort
+
 a_abort:
 	sub $sp, $sp, 16
 	jal abort
 	
 a_flush:
-	sub $sp, $sp, 4
-	sw $ra, 4($sp)
-	lw $ra, 4($sp)
-	add $sp, $sp, 4
 	jr $ra
 	
 a_itoa:
@@ -198,7 +279,9 @@ a_concat:
 	lw $t1, ($a1)
 	add $a0, $t0, $t1
 	add $a0, $a0, 5
+	sub $sp, $sp, 16
 	jal malloc
+	add $sp, $sp, 16
 	lw $t0, ($s0)
 	lw $t1, ($s1)
 	add $t0, $t0, $t1 
@@ -246,14 +329,17 @@ a_substring:
 	bgt $t0, $s0, bad_args
 	j end_bad_args
 	bad_args:
-		jal a_abort
+		li $a0, 1
+		jal a_error
 	end_bad_args:
 	move $t0, $a2
 	move $s0, $a0
 	move $s1, $a1
 	move $s2, $a2
 	add $a0, $t0, 5
+	sub $sp, $sp, 16
 	jal malloc
+	add $sp, $sp, 16
 	sw $s2, ($v0)
 	move $t0, $v0
 	add $t0, $t0, 4 #position in the new string to start adding characters
@@ -276,6 +362,3 @@ a_substring:
 	add $sp, $sp, 16
 	jr $ra
 	
-main:
-	li $a0, 0
-	jal a_exit

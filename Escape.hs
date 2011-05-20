@@ -12,13 +12,31 @@ import Data.Map(Map)
 import qualified Data.Set as S
 import Data.Set(Set)
 
+import Data.List(isPrefixOf)
+
+builtins = [getchar,
+            ord,
+            print,
+            size,
+            not,
+            chr,
+            exit,
+            error,
+            abort,
+            flush,
+            itoa,
+            concat,
+            substring]
+
 unique :: Expr -> O.Expr
 unique tree = runST $ do counter <- newSTRef 0
                          let unique' table Nil = return O.Nil
                              unique' table (Num n) = return $ O.Num n
                              unique' table (Identifier id) = case M.lookup id table of
                                                                Nothing  -> fail $ "unique renaming: unbound identifier: " ++ show id
-                                                               Just suf -> return $ O.Id (O.Undecided $ id ++ ';' : show suf)
+                                                               Just suf -> if "builtin$" `isPrefixOf` id
+                                                                           then return $ O.Id (O.Undecided id)
+                                                                           else return $ O.Id (O.Undecided $ id ++ ';' : show suf)
                              unique' table (Str str) = return $ O.Str str
                              unique' table (Binop op e1 e2) = do e1 <- unique' table e1
                                                                  e2 <- unique' table e2
@@ -44,8 +62,9 @@ unique tree = runST $ do counter <- newSTRef 0
                                                            t <- unique' table t
                                                            e <- unique' table e
                                                            return $ O.If c t e []
---                           unique' table (RecordCreation id pairs) = ??
---                           unique' table (FieldRef obj field) = 0
+                             unique' table (RecordCreation _ pairs) = let sorted_pairs = map snd $ sortBy (comparing fst) pairs
+                                                                      fmap O.RecordCreation $ mapM (unique' table) sorted_pairs
+                             unique' table (FieldRef obj field) = fail $ "escape: should never get here"
                              unique' table (ArrayCreation _ size value) = do size <- unique' table size
                                                                              value <- unique' table value
                                                                              return $ O.ArrayCreation size value []
@@ -96,12 +115,13 @@ unique tree = runST $ do counter <- newSTRef 0
                                                                         M.insert id init_suf new_table)
                                                                         
 
-                            in unique' M.empty tree
+                            in let init_env = foldr (\a env -> insert ("builtin$" ++ a) 0 env) M.empty builtins
+                               in unique' init_env tree
 
 data EscapeStatus = Escaped | Unescaped
 
 type Stack = []
-type Scope = Set ID -- the int indicates how many 
+type Scope = Set ID
 
 
 escape :: O.Expr -> ((Set ID), O.Expr)

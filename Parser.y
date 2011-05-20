@@ -60,18 +60,19 @@ import Lexer
 %left '&'
 %left '|'
 %nonassoc '<>' '<' '>' '<=' '>=' '='
+%right of
+%nonassoc then else
 
 %left '+' '-'
 %left '*' '/'
 %nonassoc neg '(' ')'
 
 %right if
-%nonassoc then else
 %right for while
 %nonassoc do to
 
 
-%right '->' ':=' of
+%right '->' ':='
 
 %%
 program :: { Expr }

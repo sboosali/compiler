@@ -1580,6 +1580,11 @@ action_123 (71) = happyShift action_55
 action_123 (72) = happyShift action_56
 action_123 _ = happyFail
 
+action_124 (51) = happyShift action_45
+action_124 (62) = happyShift action_46
+action_124 (63) = happyShift action_47
+action_124 (64) = happyShift action_48
+action_124 (65) = happyShift action_49
 action_124 _ = happyReduce_71
 
 action_125 (33) = happyShift action_131
@@ -1672,6 +1677,11 @@ action_138 (31) = happyShift action_75
 action_138 (22) = happyGoto action_140
 action_138 _ = happyFail
 
+action_139 (51) = happyShift action_45
+action_139 (62) = happyShift action_46
+action_139 (63) = happyShift action_47
+action_139 (64) = happyShift action_48
+action_139 (65) = happyShift action_49
 action_139 _ = happyReduce_62
 
 action_140 _ = happyReduce_61

@@ -44,9 +44,10 @@ toRelopEnum GreaterThan = GT
 toRelopEnum GreaterEq = GE
 
 data Val = Const Int 
-         | Mem Gensym 
+         | Mem Gensym
+         | MemScope Gensym Int -- Scope
          | MemOffset Val Val
-         deriving Show
+         deriving (Show, Eq, Ord)
 
 -- MemOffset encapsulate pointer arithmetic. The first Gensym is a location in memory. The second Gensym stores an offset from that location in memory.
 -- i.e. MemOffset a::Value b::Address
@@ -55,22 +56,27 @@ data Val = Const Int
 -- MemOffset Gensym Gensym (as opposed to MemOffset Gensym Int) allows IR to avoid doing pointer arithmetic, and to not deal with dereferncing (i.e. pointer / value dichotomy).
 
 type Offset = Val
-type Scope = Int
 type Size = Val   
 type Dest = Val
 type Src = Val
 type Env = Val 
-type Return = Val
 type Pointer = Val
 type Fun = Val
 type Arg = Val
-data Label = Label String deriving Show
+data Label = Label String
+
+instance Show Label where
+    show (Label id) = 'l':id
 
 data FunDef = FunDef Label [Val] [TAC]
             deriving Show
+
+data ErrorCode = Array_out_of_bounds | Nil_pointer_dereference | Nil_pointer_assignment deriving Show
+
 data TAC = LabelDecl Label
  | Malloc Val Val -- Malloc size location
  | AllocateString String Val
+ | MakeClosure Pointer Label 
 
  | BinopInstr BinopEnum Dest Src Src 
  | Relop RelopEnum Dest Src Src
@@ -84,6 +90,10 @@ data TAC = LabelDecl Label
  -- move the value pointed to by src into the location pointed to by dest
  | Move Dest Src
 
- | Call Fun [Arg] Return
- | MakeClosure Pointer Label 
-           deriving Show
+ | Error ErrorCode
+ | PointerEq Dest Src Src
+
+ | Call Fun [Arg] Dest
+ | Return Val
+   deriving Show
+           
