@@ -6,8 +6,6 @@ throw away types
 records & fields -> arrays & offets
 -}
 
-data A = B deriving Show
-
 data Optimization = TailCall 
                   deriving Show
 
