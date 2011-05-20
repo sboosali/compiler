@@ -24,7 +24,7 @@ import Op
 
 prefix = "a_"
 
-print = Label $ prefix++"print"
+printString = Label $ prefix++"print"
 flush = Label $ prefix++"flush"
 getChar = Label $ prefix++"getChar"
 chr = Label $ prefix++"chr"
@@ -33,7 +33,7 @@ substring = Label $ prefix++"substring"
 concat = Label $ prefix++"concat"
 not = Label $ prefix++"not"
 exit = Label $ prefix++"exit"
-error = Label $ prefix++"error"
+error = Label $ "error"
 
 --
 
@@ -197,7 +197,7 @@ translate' (Assign lval rval _) =
                                                      return $ MemOffset array offset
 
 translate' (ArrayRef array offset _) = 
-    do comment Enter "ArrayRef"
+    do --comment Enter "ArrayRef"
 
        array <- translate' array -- array[0] => size
        offset <- translate' offset
@@ -216,11 +216,11 @@ translate' (ArrayRef array offset _) =
        addLabel stay2
        addInstr $ inc offset -- tiger_array[i] is actually assembly_array[i+1]
  
-       comment Exit "ArrayRef"       
+       --comment Exit "ArrayRef"       
        return $ MemOffset array offset
 
 translate' (RecordCreation fields) = 
-    do comment Enter "RecordCreation"
+    do --comment Enter "RecordCreation"
 
        record <- mem
        locs <- mapM translate' fields
@@ -229,11 +229,11 @@ translate' (RecordCreation fields) =
        let mkField (field, i) = do addInstr $ Move (MemOffset record (Const i)) field
        mapM_ mkField $ zip locs [0..size-1]
 
-       comment Exit "RecordCreation"
+       --comment Exit "RecordCreation"
        return record
               
 translate' (ArrayCreation size init _) = 
-    do comment Enter "ArrayCreation"
+    do --comment Enter "ArrayCreation"
 
        size <- translate' size
        init <- translate' init
@@ -254,11 +254,11 @@ translate' (ArrayCreation size init _) =
        addInstr $ inc i -- i++
        addLabel end
 
-       comment Exit "ArrayCreation"
+       --comment Exit "ArrayCreation"
        return array
 
 translate' (For identifier low high body _) = 
-    do comment Enter "For"
+    do --comment Enter "For"
 
        array <- mem
        offset <- mem
@@ -303,11 +303,11 @@ translate' (For identifier low high body _) =
 
        popBreakpoint
 
-       comment Exit "For"
+       --comment Exit "For"
        return void
 
 translate' (While cond body _) = 
-    do comment Enter "While"
+    do --comment Enter "While"
 
        while_cond <- label "while_cond"
        while_body <- label "while_body"
@@ -327,11 +327,11 @@ translate' (While cond body _) =
 
        popBreakpoint      
 
-       comment Exit "While"
+       --comment Exit "While"
        return void
 
 translate' (If c t f _) = 
-    do comment Enter "If"
+    do --comment Enter "If"
 
        true_branch <- label "if_true"
        false_branch <- label "if_false"
@@ -354,18 +354,18 @@ translate' (If c t f _) =
 
        addLabel end
 
-       comment Exit "If"
+       --comment Exit "If"
        return ret
 
 translate' (Funcall name args _) = 
-    do comment Enter "Funcall"
+    do --comment Enter "Funcall"
 
        ret <- mem
        f <- translate' name
        args <- mapM translate' args
        addInstr $ Call f args ret 
        
-       comment Exit "Funcall"
+       --comment Exit "Funcall"
        return ret
 
 ------------------------------------------------

@@ -92,7 +92,7 @@ data TAC = LabelDecl Label
  -- move the value pointed to by src into the location pointed to by dest
  | Move Dest Src
 
- | Error ErrorCode
+ | Error ErrorCode -- load up arguments to error, guarantee: immediately followed by a Cjump (runtime check)
  | PointerEq Dest Src Src
 
  | Call Fun [Arg] Dest
