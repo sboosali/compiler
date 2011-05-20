@@ -40,8 +40,10 @@ error = Label $ "error"
 nil = Const 0
 void = Mem "" -- shouldn't be used, just for type checking
 
-inc :: Val -> TAC
-inc m = BinopInstr PLUS m m (Const 1)
+inc :: Val -> State Context Val -- usage = a <- inc a
+inc (Const n) = do return $ Const (n+1)
+inc m = do addInstr $ BinopInstr PLUS m m (Const 1)
+           return m
 
 toMem :: Identifier -> Val
 toMem (Escaped gs scope) = MemScope gs scope
@@ -95,7 +97,7 @@ getGensym :: Identifier -> String
 getGensym (Escaped gs scope) = gs
 getGensym (Unescaped gs) = gs 
 
-comment chunking expr = do addInstr $ Comment chunking expr
+--comment chunking expr = do addInstr $ --Comment chunking expr
 
 -------------------------------------------------------------------
 -- translate
@@ -145,42 +147,42 @@ translate' (Nil) = do return nil
 translate' (Break) = do c <- get
                         addInstr $ Jump $ head $ bs c
                         return nil
-translate' (Binop op e1 e2) = do comment Enter "Binop"
+translate' (Binop op e1 e2) = do --comment Enter "Binop"
 
                                  dest <- mem
                                  src1 <- translate' e1
                                  src2 <- translate' e2
                                  addInstr $ BinopInstr (toBinopEnum op) dest src1 src2
 
-                                 comment Exit "Binop"
+                                 --comment Exit "Binop"
                                  return dest
 
-translate' (Str s) = do comment Enter "Str"
+translate' (Str s) = do --comment Enter "Str"
                         addr <- mem
                         addInstr $ AllocateString s addr
-                        comment Exit "Str"
+                        --comment Exit "Str"
                         return addr
 
-translate' (Seq es) = do comment Enter "Seq"
+translate' (Seq es) = do --comment Enter "Seq"
                          es <- mapM translate' es
-                         comment Exit "Seq"
+                         --comment Exit "Seq"
                          return $ head $ reverse $ es 
 
-translate' (Let decls expr _) = do comment Enter "Let"
+translate' (Let decls expr _) = do --comment Enter "Let"
                                    mapM_ translateD decls
                                    body <- translate' expr 
-                                   comment Exit "Let" 
+                                   --comment Exit "Let" 
                                    return body
 
 translate' (Assign lval rval _) = 
-    do comment Enter "Assign"
+    do --comment Enter "Assign"
 
        rhs <- translate' rval
        lhs <- computeLval lval
 
        addInstr $ Move lhs rhs
 
-       comment Exit "Assign"
+       --comment Exit "Assign"
        return void
 
     where computeLval :: Expr -> State Context Val
@@ -214,7 +216,7 @@ translate' (ArrayRef array offset _) =
        addInstr $ Cjump GE offset array error stay2
 
        addLabel stay2
-       addInstr $ inc offset -- tiger_array[i] is actually assembly_array[i+1]
+       offset <- inc offset -- tiger_array[i] is actually assembly_array[i+1]
  
        --comment Exit "ArrayRef"       
        return $ MemOffset array offset
@@ -251,7 +253,7 @@ translate' (ArrayCreation size init _) =
        addInstr $ Cjump LT i size body end -- i<size
        addLabel body
        addInstr $ Move (MemOffset array i) init -- array[i]=val
-       addInstr $ inc i -- i++
+       inc <- inc i -- i++
        addLabel end
 
        --comment Exit "ArrayCreation"
@@ -277,7 +279,7 @@ translate' (For identifier low high body _) =
        high <- translate' high
        
        addInstr $ BinopInstr MINUS size high low 
-       addInstr $ inc size -- b/c range is inclusive
+       size <- inc size -- b/c range is inclusive
 
        pushBreakpoint for_end
 
@@ -288,8 +290,8 @@ translate' (For identifier low high body _) =
        addInstr $ Cjump GT low high array_end array_body
        addLabel array_body
        addInstr $ Move (MemOffset array offset) low
-       addInstr $ inc low
-       addInstr $ inc offset
+       low <- inc low
+       offset <- inc offset
        addLabel array_end
 
        addInstr $ Move offset (Const 0)
@@ -298,7 +300,7 @@ translate' (For identifier low high body _) =
        addLabel for_body
        addInstr $ Move id (MemOffset array offset)
        translate' body
-       addInstr $ inc offset
+       offset <- inc offset
        addLabel for_end
 
        popBreakpoint
@@ -368,7 +370,7 @@ translate' (Funcall name args _) =
        --comment Exit "Funcall"
        return ret
 
-------------------------------------------------
+------------------------
 -- testing
 x = Unescaped "g"
 i = Id x
