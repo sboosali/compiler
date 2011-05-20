@@ -227,8 +227,9 @@ translate' (RecordCreation fields) =
 
        record <- mem
        locs <- mapM translate' fields
-       let size = length locs       
+       let size = length locs 
 
+       addInstr $ Malloc (Const size) record
        let mkField (field, i) = do addInstr $ Move (MemOffset record (Const i)) field
        mapM_ mkField $ zip locs [0..size-1]
 
