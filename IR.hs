@@ -1,4 +1,3 @@
-{-# LANGUAGE PackageImports #-}
 module IR where
 
 import OAST
@@ -6,7 +5,7 @@ import Data.Char
 import Prelude hiding (lookup, LT, EQ, GT, error)
 import Data.Map (Map, insert, lookup, empty)
 import Control.Monad (mapM, mapM_, foldM_)
-import "mtl" Control.Monad.State
+import Control.Monad.State
 import IRSig
 import Op
 
