@@ -17,15 +17,15 @@ data BinopEnum = PLUS
            | AND
            | OR
            | XOR
-    deriving (Show, Eq)
-
-data RelopEnum = EQ 
+           | EQ 
            | NEQ
            | LT
            | GT
            | LE
            | GE
     deriving (Show, Eq)
+
+type RelopEnum = BinopEnum
 
 toBinopEnum :: Op -> BinopEnum
 toBinopEnum Add = PLUS
@@ -34,14 +34,12 @@ toBinopEnum Subtract = MINUS
 toBinopEnum Divide = DIV
 toBinopEnum And = AND
 toBinopEnum Or = OR
- 
-toRelopEnum :: Op -> RelopEnum
-toRelopEnum LessThan = LT
-toRelopEnum LessEq = LE
-toRelopEnum Equals = EQ
-toRelopEnum NotEq = NEQ
-toRelopEnum GreaterThan = GT
-toRelopEnum GreaterEq = GE
+toBinopEnum LessThan = LT
+toBinopEnum LessEq = LE
+toBinopEnum Equals = EQ
+toBinopEnum NotEq = NEQ
+toBinopEnum GreaterThan = GT
+toBinopEnum GreaterEq = GE
 
 data Val = Const Int 
          | Mem Gensym
@@ -84,7 +82,7 @@ data TAC = LabelDecl Label
  | Relop RelopEnum Dest Src Src
 
  | Jump Label
- | Cjump RelopEnum Src Src Label Label
+ | Cjump BinopEnum Src Src Label Label
 
  -- Semantics of Move: Dest and Src are in memory
  -- (but with a Src==Const, it's a load immediate)
