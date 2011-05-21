@@ -149,7 +149,9 @@ semantic tree = runST $ do cmpCounter <- newSTRef 0
                                                                                                     sub (tname, tval) t = fmap (U.swap tname tval) t 
                                                                                                     iterate' t [] = t
                                                                                                     iterate' t (binding:bs) = iterate' (sub binding t) bs
-                                                                                                    integratedTypes = iterate' types bindings  
+                                                                                                    integratedTypes = iterate' types bindings
+                                                                                                    recurrences = M.fromList $
+                                                                                                                    map (\(n,t) -> (n, U.recur n t)) $ M.toList integratedTypes
                                                                                                     newEnv = table {typeTable = M.union integratedTypes (typeTable table)}
                                                                                                     -- check for type ids yet unbound
 
