@@ -63,6 +63,8 @@ import Lexer
 %right of
 %nonassoc then else
 
+%right '->' ':='
+
 %left '+' '-'
 %left '*' '/'
 %nonassoc neg '(' ')'
@@ -72,7 +74,7 @@ import Lexer
 %nonassoc do to
 
 
-%right '->' ':='
+
 
 %%
 program :: { Expr }
@@ -98,6 +100,7 @@ ty :: { SyntacticType }
    | ty '->' ty { FunST [$1] $3}
    | '(' funargs ')' '->' ty { FunST $2 $5 }
    | '(' ')' '->' ty { FunST [] $4 }
+
 
 funargs :: { [SyntacticType] }
         : ty { [$1] }
