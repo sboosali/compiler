@@ -1,33 +1,14 @@
 module Semantic where
 
-import AST
+import AST hiding (ID)
 import qualified Data.Map as M
 import Data.Map(Map)
 import Control.Monad.ST(runST)
 import Control.Monad
 import Data.STRef
 import Data.List(elemIndex,sort)
-
-type Cmp = Int -- Unique ID for type comparison
-
-data Type = ArrayT Cmp Type
-          | RecordT Cmp [(ID, Type)]
-          | FunctionT [Type] Type
-          | NilT
-          | NumT
-          | StrT
-          | VoidT
-  deriving (Show, Ord)
-
-instance Eq Type where
-   (ArrayT n1 _) == (ArrayT n2 _) = n1 == n2
-   (RecordT n1 _) == (RecordT n2 _) = n1 == n2
-   (FunctionT args1 ret1) == (FunctionT args2 ret2) = args1 == args2 && ret1 == ret2
-   NilT == NilT = True
-   NumT == NumT = True
-   StrT == StrT = True
-   VoidT == VoidT = True
-   _ == _ = False
+import qualified Unify as U
+import Type
 
 data SymbolTable = SymbolTable {valueTable :: Map ID Type,
                                 typeTable  :: Map ID Type}
@@ -156,12 +137,26 @@ semantic tree = runST $ do cmpCounter <- newSTRef 0
                                                                                                      return (ret, Funcall fun args)
                                                                        t -> fail $ "Expected function type at function call: " ++ show t
                                type_of table Break = return (VoidT, Break)
+
+                               {- LET -}
+                               -- U.check :: Expr -> (Expr, Map ID Type)
                                type_of table (Let [] es) = do (t, Seq es) <- type_of table (Seq es)
                                                               return (t, Let [] es)
-                               type_of table (Let (d@(TypeDec tname synType):decs) es) = do var_type <- parseSyntacticType table synType
-                                                                                            let new_table = addTypeBinding table tname var_type
-                                                                                            (t, Let decs es) <- type_of new_table (Let decs es)
-                                                                                            return (t, Let (d:decs) es)
+
+                               type_of table oldLet@(Let (d@(TypeDec tname synType):_) es) = do let (newLet, types) = U.check oldLet
+                                                                                                    -- integrate into current env
+                                                                                                    bindings = M.assocs (typeTable table)
+                                                                                                    sub (tname, tval) t = fmap (U.swap tname tval) t 
+                                                                                                    iterate' t [] = t
+                                                                                                    iterate' t (binding:bs) = iterate' (sub binding t) bs
+                                                                                                    integratedTypes = iterate' types bindings  
+                                                                                                    newEnv = table {typeTable = M.union integratedTypes (typeTable table)}
+                                                                                                    -- check for type ids yet unbound
+
+                                                                                                if U.anyUnbound integratedTypes 
+                                                                                                  then fail $ "Unbound Type in Mutually Recursive block of type decs"
+                                                                                                  else type_of newEnv newLet
+                                                                                                    
                                type_of table (Let ((UntypedVarDec id expr):decs) es) = do (expr_type, expr) <- type_of table expr
                                                                                           (t, Let decs es) <- type_of (addValueBinding table id expr_type) (Let decs es)
                                                                                           return (t, Let ((UntypedVarDec id expr):decs) es)
@@ -192,6 +187,7 @@ semantic tree = runST $ do cmpCounter <- newSTRef 0
                                                                                                       (_, body) <- type_check body_env' body return_type
                                                                                                       (t, Let decs es) <- type_of new_table (Let decs es)
                                                                                                       return (t, Let ((TypedFunDec fun args returns body):decs) es)
+                               {- -}
 
                                getFieldId fields fieldname = let sorted_fields = sort fields
                                                              in case fieldname `elemIndex` fields of

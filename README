@@ -1,0 +1,40 @@
+Scott Newman, Hari Narayanan, Sam Boosalis
+
+"Weird Infinity"
+A Tiger Compiler 
+
+This is the companion to our Tiger compiler. We wrote 
+our compiler in Haskell - this gave some nice benefits and presented 
+some interesting challenges. 
+
+Certain segments of the compiler became more difficult to program 
+through our use of Haskell. For example, we created unique identifiers 
+for all variables by keeping a counter and incrementing it each time we 
+encountered new bindings. Yet, state and mutation don't exist in 
+Haskell, so we couldn't mutate variables, which was a problem since we 
+browsed the abstract syntax tree depth-first. We would often have to pass the tree 
+around, making certain computations slow and laborious. In addition, it made some features of
+Tiger such as recursive types extremely difficult. It forced us to implement
+a full unification algorithm to determine the types without using mutation.
+
+Some advantages afforded by Haskell include instances of pattern matching. Codegen
+was made much easier by the fact that we could pattern match on types of code. In addition,
+certain long strings of operations were made much easier by Haskell's composability.
+
+Our representation of registers and memory in IR was a unique approach. We represented memory
+using the "Mem" or "MemOffset" data types. We thought this was an interesting strategy because
+it allowed us to represent operations on memory as arbitrarily as possible. This means that 
+our IR is very portable.
+
+The implementation of this strategy can be seen in moveToVal and moveToReg, two functions
+which represent moving arbitrary data in memory to registers, and vice-versa. This is
+an abstraction over the idea of operations on memory. The way they work is by representing
+memory locations are relative, and actually determining them as we 
+generate code.
+
+Overall, our choice of language really did have a great bearing on 
+implementations, and affected development greatly. For example, 
+Haskell's amazing ability to match patterns in lists, such as [4, 8, 
+..] representing the list [4,8,12,16,20,24,etc.] made things like 
+calculating offerts of registers really easy in Haskell.
+

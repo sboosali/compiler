@@ -6,11 +6,12 @@ import Semantic
 import Escape
 import IR
 import Codegen
+import AST
+import qualified Unify 
 
 import System
 import IO
 import Control.Monad
-
 
 main = do
   args <- System.getArgs
@@ -22,9 +23,6 @@ main = do
       (fundefs, instrs) = translate canonical
   codegen instrs fundefs  
   
-
-
-
 debug f = do
   args <- System.getArgs
   text <- readFile f
@@ -34,3 +32,10 @@ debug f = do
   forM_ fundefs print
   putStrLn ""
   forM_ instrs print
+
+unify = do
+  args <- System.getArgs
+  text <- readFile $ head args
+  let ast@(Let ds e) = parse $ tokenize text
+  let (_,t) = Unify.check ast
+  return t
