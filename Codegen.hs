@@ -16,15 +16,12 @@ binopInstr MINUS = "sub"
 binopInstr DIV = "div"
 binopInstr AND = "and"
 binopInstr OR = "or"
-
-
-relopInstr :: RelopEnum -> String
-relopInstr LT = "slt"
-relopInstr LE = "sle"
-relopInstr EQ = "seq"
-relopInstr NEQ = "sne"
-relopInstr GT = "sgt"
-relopInstr GE = "sge"
+binopInstr LT = "slt"
+binopInstr LE = "sle"
+binopInstr EQ = "seq"
+binopInstr NEQ = "sne"
+binopInstr GT = "sgt"
+binopInstr GE = "sge"
 
 relopInstrJump :: RelopEnum -> String
 relopInstrJump LT = "blt"
@@ -119,7 +116,7 @@ codegen instrs fs = do memory <- H.new (==) H.hashString
         
                            codegen' (Relop op d s1 s2) = do moveToReg s1 T1
                                                             moveToReg s2 T2
-                                                            write $ makeTernaryInstr (relopInstr op) T0 T1 T2
+                                                            write $ makeTernaryInstr (binopInstr op) T0 T1 T2
                                                             moveToVal d T0
                                                                   
                            codegen' (Move dest src) = do moveToReg src  T0
@@ -188,12 +185,12 @@ codegen instrs fs = do memory <- H.new (==) H.hashString
                                                                                       replicateM scope $ write $ "lw $t3, ($t3)" -- go up one scope
                                                                                       write $ "lw " ++ show reg ++ ", " ++ show offset ++ "($t3)" -- index into the EVR
         
-        
+                           moveToReg (MemOffset v1 (Const n)) reg = do moveToReg v1 T1
+                                                                       write $ "lw " ++ show reg ++ ", " ++ show (4 * n) ++ "($t1)"
                            moveToReg (MemOffset v1 v2) reg = do moveToReg v1 T1
                                                                 moveToReg v2 T2
-                                                                write $ "move $t6, $t1"
-                                                                write $ "mul $t5, $t2, 4"
-                                                                write $ "add $t4, $t5, $t6"
+                                                                write $ "mul $t2, $t2, 4"
+                                                                write $ "add $t4, $t1, $t2"
                                                                 write $ "lw " ++ show reg ++ ", ($t4)"
 
                            moveToReg (Const num) reg = write $ "li " ++ show reg ++ ", " ++ show num
@@ -210,11 +207,13 @@ codegen instrs fs = do memory <- H.new (==) H.hashString
                                                                     Just offset -> do write $ "lw $t3, 4($fp)"
                                                                                       replicateM scope $ write $ "lw $t3, ($t3)" -- go up one scope
                                                                                       write $ "sw " ++ show reg ++ ", " ++ show offset ++ "($t3)" -- index into the EVR
+
+                           moveToVal (MemOffset v1 (Const n)) reg = do moveToReg v1 T1
+                                                                       write $ "sw " ++ show reg ++ ", " ++ show (4 * n) ++ "($t1)"
                            moveToVal (MemOffset v1 v2) reg = do moveToReg v1 T1
                                                                 moveToReg v2 T2
-                                                                write $ "move $t6, $t1"
-                                                                write $ "mul $t5, $t2, 4"
-                                                                write $ "add $t4, $t5, $t6"
+                                                                write $ "mul $t2, $t2, 4"
+                                                                write $ "add $t4, $t1, $t2"
                                                                 write $ "sw " ++ show reg ++ ", ($t4)"
 
                            moveToVal (Const _) _ = fail $ "codegen: attempt to write into Const"

@@ -31,8 +31,6 @@ debug f = do
   let (t, ast) = semantic $ parse $ tokenize text
       canonical = escape $ unique $ ast
       (fundefs, instrs) = translate canonical
---  codegen instrs fundefs  
   forM_ fundefs print
   putStrLn ""
   forM_ instrs print
-  return canonical

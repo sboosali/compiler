@@ -45,9 +45,17 @@ inc (Const n) = do return $ Const (n+1)
 inc m = do addInstr $ BinopInstr PLUS m m (Const 1)
            return m
 
+dec (Const n) = do return $ Const (n-1)
+dec m = do addInstr $ BinopInstr MINUS m m (Const 1)
+           return m
+
+
 toMem :: Identifier -> Val
 toMem (Escaped gs scope) = MemScope gs scope
 toMem (Unescaped gs) = Mem gs 
+
+toLabel (Escaped gs scope) = Label gs
+toLabel (Unescaped gs) = Label gs
 
 type StreamT = [Int]
 type BreakpointsT = [Label]
@@ -127,14 +135,15 @@ translateD (FunDec name params body _) =
        ret <- translate' body 
        c <- get
        let funBody = reverse $ Return ret : tacs c
-       let f = getGensym name
+       let fmem = toMem name
+       let flabel = toLabel name
        
        let ps = map toMem params
 
-       let functionDefinition = FunDef (Label f) ps funBody
+       let functionDefinition = FunDef flabel ps funBody
        put $ c {fundefs = functionDefinition : fundefs c, tacs = instructions} -- add fundef, then restore program instructions
 
-       addInstr $ MakeClosure (Mem f) (Label f)
+       addInstr $ MakeClosure fmem flabel  
        return void
 
 -------------------------------------------------------------------
@@ -206,6 +215,7 @@ translate' (ArrayRef array offset _) =
        offset <- translate' offset
        stay1 <- label "stay1"
        stay2 <- label "stay2"
+       stay3 <- label "stay3"
 
        -- runtime check: nil pointer derefence
        addInstr $ Error Nil_pointer_dereference
@@ -217,6 +227,10 @@ translate' (ArrayRef array offset _) =
        addInstr $ Cjump GE offset size error stay2
 
        addLabel stay2
+       addInstr $ Error Array_out_of_bounds
+       addInstr $ Cjump LT offset (Const 0) error stay3
+
+       addLabel stay3
        offset <- inc offset -- tiger_array[i] is actually assembly_array[i+1]
  
        --comment Exit "ArrayRef"       
@@ -239,24 +253,27 @@ translate' (RecordCreation fields) =
 translate' (ArrayCreation size init _) = 
     do --comment Enter "ArrayCreation"
 
-       size <- translate' size
-       size <- inc size
+       size <- translate' size  
+       mips_array_size <- mem
        init <- translate' init
        i <- mem
        array <- mem
-       temp <- mem
        cond <- label "create_array_cond"
        body <- label "create_array_body"
        end <- label "create_array_end"
        
-       addInstr $ Malloc size array
+       addInstr $ BinopInstr PLUS mips_array_size size (Const 1)
+       addInstr $ Malloc mips_array_size array
        -- for i=0, i<size, array[i]=val, i++
-       addInstr $ Move i (Const 0) -- i=0
+       addInstr $ Move (MemOffset array (Const 0)) size -- mips_array[0]=size
+
+       addInstr $ Move i (Const 1) -- i=0 i.e. 1
        addLabel cond
-       addInstr $ Cjump LT i size body end -- i<size
+       addInstr $ Cjump LT i mips_array_size body end -- i<size i.e. size+1
        addLabel body
        addInstr $ Move (MemOffset array i) init -- array[i]=val
        i <- inc i -- i++
+       addInstr $ Jump cond
        addLabel end
 
        --comment Exit "ArrayCreation"
@@ -295,6 +312,7 @@ translate' (For identifier low high body _) =
        addInstr $ Move (MemOffset array offset) low
        low <- inc low
        offset <- inc offset
+       addInstr $ Jump array_cond
        addLabel array_end
 
        addInstr $ Move offset (Const 0)
@@ -304,6 +322,7 @@ translate' (For identifier low high body _) =
        addInstr $ Move id (MemOffset array offset)
        translate' body
        offset <- inc offset
+       addInstr $ Jump for_cond
        addLabel for_end
 
        popBreakpoint
