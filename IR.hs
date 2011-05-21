@@ -240,7 +240,7 @@ translate' (ArrayCreation size init _) =
     do --comment Enter "ArrayCreation"
 
        size <- translate' size
-       size < inc size
+       size <- inc size
        init <- translate' init
        i <- mem
        array <- mem
