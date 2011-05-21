@@ -61,7 +61,7 @@ import Lexer
 %left '|'
 %nonassoc '<>' '<' '>' '<=' '>=' '='
 %right of
-%nonassoc then else
+%nonassoc then else do to
 
 %right '->' ':='
 
@@ -71,7 +71,6 @@ import Lexer
 
 %right if
 %right for while
-%nonassoc do to
 
 
 
