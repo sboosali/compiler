@@ -85,7 +85,7 @@ mem = do n <- gensym
 
 label :: String -> State Context Label
 label name = do n <- gensym
-                return $ Label (name ++ "$$" ++ show n)
+                return $ Label (name ++ ".." ++ show n)
 
 nats :: Int -> [Int]
 nats n = n : nats (n+1)
@@ -202,6 +202,7 @@ translate' (ArrayRef array offset _) =
     do --comment Enter "ArrayRef"
 
        array <- translate' array -- array[0] => size
+       let size = MemOffset array (Const 0)
        offset <- translate' offset
        stay1 <- label "stay1"
        stay2 <- label "stay2"
@@ -213,7 +214,7 @@ translate' (ArrayRef array offset _) =
        -- runtime check: array out of bounds       
        addLabel stay1
        addInstr $ Error Array_out_of_bounds
-       addInstr $ Cjump GE offset array error stay2
+       addInstr $ Cjump GE offset size error stay2
 
        addLabel stay2
        offset <- inc offset -- tiger_array[i] is actually assembly_array[i+1]
@@ -226,8 +227,9 @@ translate' (RecordCreation fields) =
 
        record <- mem
        locs <- mapM translate' fields
-       let size = length locs       
+       let size = length locs 
 
+       addInstr $ Malloc (Const size) record
        let mkField (field, i) = do addInstr $ Move (MemOffset record (Const i)) field
        mapM_ mkField $ zip locs [0..size-1]
 
@@ -238,7 +240,7 @@ translate' (ArrayCreation size init _) =
     do --comment Enter "ArrayCreation"
 
        size <- translate' size
-       size <- inc size
+       size < inc size
        init <- translate' init
        i <- mem
        array <- mem
