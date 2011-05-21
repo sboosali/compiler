@@ -1082,6 +1082,11 @@ action_71 (69) = happyFail
 action_71 (70) = happyFail
 action_71 _ = happyReduce_47
 
+action_72 (51) = happyShift action_45
+action_72 (62) = happyShift action_46
+action_72 (63) = happyShift action_47
+action_72 (64) = happyShift action_48
+action_72 (65) = happyShift action_49
 action_72 _ = happyReduce_63
 
 action_73 (43) = happyShift action_44
