@@ -44,16 +44,11 @@ builtins = let values = [("print",     FunctionT [StrT]           VoidT),
 
 semantic :: Expr -> (Type, Expr)
 semantic tree = runST $ do cmpCounter <- newSTRef 0
-                           let check NilT (RecordT _ _) = return ()
-                               check actual expected = if actual == expected
-                                                       then return ()
-                                                       else fail $ "type mismatch: expected "
-                                                                ++ show expected ++ " but got " ++ show actual
- 
+                           let
 --                             type_check :: SymbolTable -> Expr -> Type -> TC Type
                                type_check table expr expected = do (actual, new_expr) <- type_of table expr
                                                                    case (actual, expected) of
-                                                                     (NilT, (RecordT _ _)) -> return (NilT, new_expr)
+                                                                     (NilT, (RecordT _ _ _)) -> return (NilT, new_expr)
                                                                      _ -> if actual == expected
                                                                           then return (actual, new_expr)
                                                                           else fail $  "Type mismatch: Expected " ++ show expected
@@ -103,12 +98,12 @@ semantic tree = runST $ do cmpCounter <- newSTRef 0
                                                              return (thenT, If c t e)
 
                                type_of table (RecordCreation id bindings) = case M.lookup id $ typeTable table of
-                                                                              Just t@(RecordT _ fields) -> do bindings <- forM fields $ \(name, ftype) ->
-                                                                                                                             case lookup name bindings of
-                                                                                                                               Just val -> do (_, val) <- type_check table val ftype
-                                                                                                                                              return (name, val)
-                                                                                                                               Nothing -> fail $ "Missing field declaration " ++ show name
-                                                                                                              return (t, RecordCreation id bindings)
+                                                                              Just t@(RecordT _ _ fields) -> do bindings <- forM fields $ \(name, ftype) ->
+                                                                                                                               case lookup name bindings of
+                                                                                                                                 Just val -> do (_, val) <- type_check table val ftype
+                                                                                                                                                return (name, val)
+                                                                                                                                 Nothing -> fail $ "Missing field declaration " ++ show name
+                                                                                                                return (t, RecordCreation id bindings)
                                                                               Just t -> fail $ "Expected record type at record creation: " ++ show t
                                                                               Nothing -> fail $ "Unbound type identifier " ++ id
   
@@ -119,9 +114,9 @@ semantic tree = runST $ do cmpCounter <- newSTRef 0
                                                                                                           return (array_type, ArrayCreation t size init)
                                type_of table (FieldRef obj fieldname) = do (obj_type, obj) <- type_of table obj
                                                                            case obj_type of
-                                                                             RecordT _ fields -> case lookup fieldname fields of
-                                                                                                   Just t -> return (t, ArrayRef obj $Num$getFieldId (map fst fields) fieldname)
-                                                                                                   Nothing -> fail $ "Nonexistent field: " ++ show fieldname
+                                                                             RecordT _ _ fields -> case lookup fieldname fields of
+                                                                                                     Just t -> return (t, ArrayRef obj $Num$getFieldId (map fst fields) fieldname)
+                                                                                                     Nothing -> fail $ "Nonexistent field: " ++ show fieldname
                                                                              t -> fail $ "Expected record type at field ref: " ++ show t
                                                                                                                                                               
                                type_of table (ArrayRef obj index) = do (obj_type, obj) <- type_of table obj
@@ -152,10 +147,10 @@ semantic tree = runST $ do cmpCounter <- newSTRef 0
                                                                                                     integratedTypes = iterate' types bindings
                                                                                                     recurrences = M.fromList $
                                                                                                                     map (\(n,t) -> (n, U.recur n t)) $ M.toList integratedTypes
-                                                                                                    newEnv = table {typeTable = M.union integratedTypes (typeTable table)}
+                                                                                                    newEnv = table {typeTable = M.union recurrences (typeTable table)}
                                                                                                     -- check for type ids yet unbound
 
-                                                                                                if U.anyUnbound integratedTypes 
+                                                                                                if U.anyUnbound recurrences
                                                                                                   then fail $ "Unbound Type in Mutually Recursive block of type decs"
                                                                                                   else type_of newEnv newLet
                                                                                                     
@@ -204,7 +199,7 @@ semantic tree = runST $ do cmpCounter <- newSTRef 0
                                                                                cmp <- readSTRef cmpCounter
                                                                                let names = map fst fields
                                                                                    types = map (lookupTypeID table . snd) fields
-                                                                               return $ RecordT cmp $ zip names types
+                                                                               return $ RecordT cmp False $ zip names types
                                parseSyntacticType table (FunST args return_type) = do args <- mapM (parseSyntacticType table) args
                                                                                       return_type <- parseSyntacticType table return_type
                                                                                       return $ FunctionT args return_type
