@@ -103,7 +103,7 @@ semantic tree = runST $ do cmpCounter <- newSTRef 0
                                                              return (thenT, If c t e)
 
                                type_of table (RecordCreation id bindings) = case M.lookup id $ typeTable table of
-                                                                              Just t@(RecordT _ _ fields) -> do bindings <- forM fields $ \(name, ftype) ->
+                                                                              Just t@(RecordT _ _ fields) -> do bindings <- forM (sort fields) $ \(name, ftype) ->
                                                                                                                                case lookup name bindings of
                                                                                                                                  Just val -> do (_, val) <- type_check table val ftype
                                                                                                                                                 return (name, val)
@@ -195,7 +195,7 @@ semantic tree = runST $ do cmpCounter <- newSTRef 0
                                                                                                       return (t, Let ((TypedFunDec fun args returns body):decs) es)
                                {- -}
 
-                               getFieldId fields fieldname = case fieldname `elemIndex` fields of
+                               getFieldId fields fieldname = case fieldname `elemIndex` sort fields of
                                                                Nothing -> error $ "unknown field member " ++ show fieldname
                                                                Just i -> i
 
