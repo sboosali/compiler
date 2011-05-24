@@ -243,9 +243,10 @@ translate' (RecordCreation fields) =
        locs <- mapM translate' fields
        let size = length locs 
 
-       addInstr $ Malloc (Const size) record
+       addInstr $ Malloc (Const $ size + 1) record
+       addInstr $ Move (MemOffset record (Const 0)) (Const size)
        let mkField (field, i) = do addInstr $ Move (MemOffset record (Const i)) field
-       mapM_ mkField $ zip locs [0..size-1]
+       mapM_ mkField $ zip locs [1..size]
 
        --comment Exit "RecordCreation"
        return record
@@ -254,7 +255,7 @@ translate' (ArrayCreation size init _) =
     do --comment Enter "ArrayCreation"
 
        size <- translate' size  
-       mips_array_size <- mem
+       mips_array_size <- inc size
        init <- translate' init
        i <- mem
        array <- mem
@@ -262,7 +263,6 @@ translate' (ArrayCreation size init _) =
        body <- label "create_array_body"
        end <- label "create_array_end"
        
-       addInstr $ BinopInstr PLUS mips_array_size size (Const 1)
        addInstr $ Malloc mips_array_size array
        -- for i=0, i<size, array[i]=val, i++
        addInstr $ Move (MemOffset array (Const 0)) size -- mips_array[0]=size
