@@ -9,6 +9,7 @@ import Data.STRef
 import Data.List(elemIndex,sort)
 import qualified Unify as U
 import Type
+import Op
 
 data SymbolTable = SymbolTable {valueTable :: Map ID Type,
                                 typeTable  :: Map ID Type}
@@ -48,7 +49,8 @@ semantic tree = runST $ do cmpCounter <- newSTRef 0
 --                             type_check :: SymbolTable -> Expr -> Type -> TC Type
                                type_check table expr expected = do (actual, new_expr) <- type_of table expr
                                                                    case (actual, expected) of
-                                                                     (NilT, (RecordT _ _ _)) -> return (NilT, new_expr)
+                                                                     (NilT, RecordT _ _ _) -> return (NilT, new_expr)
+                                                                     (r@(RecordT _ _ _), NilT) -> return (r, new_expr)
                                                                      _ -> if actual == expected
                                                                           then return (actual, new_expr)
                                                                           else fail $  "Type mismatch: Expected " ++ show expected
@@ -63,6 +65,9 @@ semantic tree = runST $ do cmpCounter <- newSTRef 0
                                type_of table (Identifier id) = case M.lookup id $ valueTable table of
                                                                  Just t  -> return (t, Identifier id)
                                                                  Nothing -> fail $ "Unbound identifier " ++ id
+                               type_of table (Binop Equals e1 e2) = do (t1, e1) <- type_of table e1
+                                                                       (_, e2) <- type_check table e2 t1
+                                                                       return (NumT, Binop Equals e1 e2)
                                type_of table (Binop op e1 e2) = do (_, e1) <- type_check table e1 NumT
                                                                    (_, e2) <- type_check table e2 NumT
                                                                    return (NumT, Binop op e1 e2)
@@ -142,16 +147,20 @@ semantic tree = runST $ do cmpCounter <- newSTRef 0
                                                                                                     -- integrate into current env
                                                                                                     bindings = M.assocs (typeTable table)
                                                                                                     sub (tname, tval) t = fmap (U.swap tname tval) t 
-                                                                                                    iterate' t [] = t
-                                                                                                    iterate' t (binding:bs) = iterate' (sub binding t) bs
-                                                                                                    integratedTypes = iterate' types bindings
-                                                                                                    recurrences = M.fromList $
+                                                                                                    iterate' [] t = t
+                                                                                                    iterate' (binding:bs) t = iterate' bs (sub binding t)
+                                                                                                    repeat 0 bs t = t
+                                                                                                    repeat n bs t = let r = repeat (n-1) bs t 
+                                                                                                                        bs' = M.assocs r
+                                                                                                                    in iterate' bs' r
+                                                                                                    integratedTypes = repeat 100 bindings types
+                                                                                                    recurrences = iterate' bindings $ M.fromList $
                                                                                                                     map (\(n,t) -> (n, U.recur n t)) $ M.toList integratedTypes
                                                                                                     newEnv = table {typeTable = M.union recurrences (typeTable table)}
                                                                                                     -- check for type ids yet unbound
 
                                                                                                 if U.anyUnbound recurrences
-                                                                                                  then fail $ "Unbound Type in Mutually Recursive block of type decs"
+                                                                                                  then fail $ "Escaped unbound: " ++ show recurrences
                                                                                                   else type_of newEnv newLet
                                                                                                     
                                type_of table (Let ((UntypedVarDec id expr):decs) es) = do (expr_type, expr) <- type_of table expr

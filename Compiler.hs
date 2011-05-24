@@ -18,10 +18,10 @@ main = do
   text <- if null args
           then hGetContents stdin
           else readFile $ head args 
-  let (t, ast) = semantic $ parse $ tokenize text
+  let (_, ast) = semantic $ parse $ tokenize text
       canonical = escape $ unique $ ast
       (fundefs, instrs) = translate canonical
-  codegen instrs fundefs  
+  ast `seq` codegen instrs fundefs  -- force type errors before codegen
   
 debug f = do
   args <- System.getArgs
@@ -32,10 +32,3 @@ debug f = do
   forM_ fundefs print
   putStrLn ""
   forM_ instrs print
-
-unify = do
-  args <- System.getArgs
-  text <- readFile $ head args
-  let ast@(Let ds e) = parse $ tokenize text
-  let (_,t) = Unify.check ast
-  return t
