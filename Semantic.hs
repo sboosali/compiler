@@ -196,7 +196,7 @@ semantic tree = runST $ do cmpCounter <- newSTRef 0
                                {- -}
 
                                getFieldId fields fieldname = let sorted_fields = sort fields
-                                                             in case fieldname `elemIndex` fields of
+                                                             in case fieldname `elemIndex` sorted_fields of
                                                                   Nothing -> error $ "unknown field member " ++ show fieldname
                                                                   Just i -> i
 
