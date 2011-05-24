@@ -195,10 +195,9 @@ semantic tree = runST $ do cmpCounter <- newSTRef 0
                                                                                                       return (t, Let ((TypedFunDec fun args returns body):decs) es)
                                {- -}
 
-                               getFieldId fields fieldname = let sorted_fields = sort fields
-                                                             in case fieldname `elemIndex` sorted_fields of
-                                                                  Nothing -> error $ "unknown field member " ++ show fieldname
-                                                                  Just i -> i
+                               getFieldId fields fieldname = case fieldname `elemIndex` sorted_fields of
+                                                               Nothing -> error $ "unknown field member " ++ show fieldname
+                                                               Just i -> i
 
                                parseSyntacticType table (VarST id) = return $ lookupTypeID table id
                                parseSyntacticType table (ArrayST id) = do modifySTRef cmpCounter (+1)
