@@ -1,4 +1,4 @@
-Scott Newman, Hari Narayanan, Sam Boosalis
+Hari Narayanan, Sam Boosalis, Scott Newman
 
 "Weird Infinity"
 A Tiger Compiler 
@@ -32,9 +32,4 @@ an abstraction over the idea of operations on memory. The way they work is by re
 memory locations are relative, and actually determining them as we 
 generate code.
 
-Overall, our choice of language really did have a great bearing on 
-implementations, and affected development greatly. For example, 
-Haskell's amazing ability to match patterns in lists, such as [4, 8, 
-..] representing the list [4,8,12,16,20,24,etc.] made things like 
-calculating offerts of registers really easy in Haskell.
-
+Haskell's functional purity was a curse and its pattern patching a blessing.
